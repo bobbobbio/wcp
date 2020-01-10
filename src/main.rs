@@ -1,8 +1,11 @@
 /* copyright Remi Bernotavicius 2020 */
 
 use http_io::client::HttpClient;
+use http_io::protocol::{HttpBody, OutgoingBody};
 use http_io::url::Url;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::convert::Infallible;
+use std::fmt;
 use std::fs::File;
 use std::io;
 use std::net::TcpStream;
@@ -29,11 +32,131 @@ impl From<http_io::error::Error> for Error {
     }
 }
 
+#[derive(Debug)]
+enum Location {
+    Remote(Url),
+    Local(PathBuf),
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Local(p) => write!(f, "{}", p.to_string_lossy()),
+            Self::Remote(u) => write!(f, "{}", u),
+        }
+    }
+}
+
+impl std::str::FromStr for Location {
+    type Err = Infallible;
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        if let Ok(p) = s.parse() {
+            Ok(Self::Remote(p))
+        } else {
+            Ok(Self::Local(PathBuf::from(s)))
+        }
+    }
+}
+
+impl Location {
+    fn is_dir(&self) -> bool {
+        match self {
+            Self::Local(p) => p.is_dir(),
+            Self::Remote(u) => u.path.trailing_slash(),
+        }
+    }
+
+    fn push(&mut self, component: &str) {
+        match self {
+            Self::Local(p) => p.push(component),
+            Self::Remote(u) => u.path.push(component),
+        }
+    }
+
+    fn name(&self) -> String {
+        match self {
+            Self::Local(p) => p.file_name().unwrap().to_string_lossy().into(),
+            Self::Remote(u) => u
+                .path
+                .components()
+                .last()
+                .unwrap_or("index.html".into())
+                .into(),
+        }
+    }
+}
+
+struct CopyContext {
+    http_client: HttpClient<TcpStream>,
+}
+
+impl CopyContext {
+    fn new() -> Self {
+        Self {
+            http_client: HttpClient::<TcpStream>::new(),
+        }
+    }
+}
+
+trait StreamSize {
+    fn stream_size(&self) -> Option<u64>;
+}
+
+trait CopySource<'a> {
+    type Stream: io::Read + StreamSize + 'a;
+    fn open_for_read(&self, context: &'a mut CopyContext) -> Result<Self::Stream>;
+}
+
+trait CopySink {
+    type Stream: io::Write;
+    fn open_for_write(&self, context: &mut CopyContext) -> Result<Self::Stream>;
+}
+
+impl<R: io::Read> StreamSize for HttpBody<R> {
+    fn stream_size(&self) -> Option<u64> {
+        self.content_length()
+    }
+}
+
+impl<'a> CopySource<'a> for Url {
+    type Stream = HttpBody<&'a mut TcpStream>;
+    fn open_for_read(&self, context: &'a mut CopyContext) -> Result<Self::Stream> {
+        Ok(context.http_client.get(self.clone())?.finish()?.body)
+    }
+}
+
+impl CopySink for Url {
+    type Stream = OutgoingBody<TcpStream>;
+    fn open_for_write(&self, _context: &mut CopyContext) -> Result<Self::Stream> {
+        unimplemented!()
+    }
+}
+
+impl StreamSize for File {
+    fn stream_size(&self) -> Option<u64> {
+        unimplemented!()
+    }
+}
+
+impl<'a> CopySource<'a> for PathBuf {
+    type Stream = File;
+    fn open_for_read(&self, _context: &'a mut CopyContext) -> Result<Self::Stream> {
+        unimplemented!()
+    }
+}
+
+impl CopySink for PathBuf {
+    type Stream = File;
+    fn open_for_write(&self, _context: &mut CopyContext) -> Result<Self::Stream> {
+        Ok(File::create(self)?)
+    }
+}
+
 #[derive(Debug, StructOpt)]
 #[structopt(name = "wcp", about = "Web Copy. Copies URLs to local destinations")]
 struct Options {
-    url: http_io::url::Url,
-    output: PathBuf,
+    source: Location,
+    destination: Location,
 }
 
 const DEFAULT_BUF_SIZE: usize = 8 * 1024;
@@ -61,22 +184,18 @@ where
     }
 }
 
-fn do_copy(url: Url, output: PathBuf) -> Result<()> {
-    let mut client = HttpClient::<TcpStream>::new();
+fn do_io_copy<SOURCE, SINK>(source: SOURCE, destination: SINK) -> Result<()>
+where
+    for<'a> SOURCE: CopySource<'a>,
+    SINK: CopySink,
+{
+    let mut source_context = CopyContext::new();
+    let mut destination_context = CopyContext::new();
 
-    let destination = if output.is_dir() {
-        let name = url.path.components().last().unwrap_or("index.html");
-        output.join(name)
-    } else {
-        output
-    };
+    let mut source_stream = source.open_for_read(&mut source_context)?;
+    let mut destination_stream = destination.open_for_write(&mut destination_context)?;
 
-    let mut output_file = File::create(&destination)?;
-    println!("copying {} to {}", url, destination.to_string_lossy());
-
-    let mut body = client.get(url)?.finish()?.body;
-
-    let mut progress = match body.content_length() {
+    let mut progress = match source_stream.stream_size() {
         Some(length) => ProgressBar::new(length),
         None => ProgressBar::new_spinner(),
     };
@@ -86,9 +205,26 @@ fn do_copy(url: Url, output: PathBuf) -> Result<()> {
             .template("{wide_bar} {bytes}/{total_bytes} ({bytes_per_sec}) (eta {eta})"),
     );
 
-    io_copy_with_progress(&mut body, &mut output_file, &mut progress)?;
+    io_copy_with_progress(&mut source_stream, &mut destination_stream, &mut progress)?;
 
     Ok(())
+}
+
+fn do_copy(source: Location, mut destination: Location) -> Result<()> {
+    if destination.is_dir() {
+        destination.push(&source.name());
+    }
+
+    println!("copying {} to {}", source, destination);
+
+    match (source, destination) {
+        (Location::Local(source), Location::Local(destination)) => do_io_copy(source, destination),
+        (Location::Local(source), Location::Remote(destination)) => do_io_copy(source, destination),
+        (Location::Remote(source), Location::Local(destination)) => do_io_copy(source, destination),
+        (Location::Remote(source), Location::Remote(destination)) => {
+            do_io_copy(source, destination)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -124,7 +260,7 @@ fn test_do_copy() {
     let temporary_file = tempfile::NamedTempFile::new().unwrap();
     let local_path = temporary_file.path().to_path_buf();
 
-    do_copy(url, local_path.clone()).unwrap();
+    do_copy(Location::Remote(url), Location::Local(local_path.clone())).unwrap();
 
     let contents = std::fs::read_to_string(local_path).unwrap();
     assert_eq!(contents, "file_data");
@@ -132,5 +268,5 @@ fn test_do_copy() {
 
 fn main() -> Result<()> {
     let options = Options::from_args();
-    do_copy(options.url, options.output)
+    do_copy(options.source, options.destination)
 }
