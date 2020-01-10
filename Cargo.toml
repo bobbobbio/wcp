@@ -3,6 +3,10 @@ name = "wcp"
 version = "0.1.0"
 authors = ["Remi Bernotavicius <remi@kunugiken.com>"]
 edition = "2018"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/bobbobbio/wcp"
+homepage = "https://github.com/bobbobbio/wcp"
+description = "Command-line tool for downloading files via HTTP"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
