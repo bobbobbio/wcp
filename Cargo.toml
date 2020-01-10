@@ -7,9 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-http_io = { path = "../http_io" }
-indicatif = "*"
-structopt = "*"
+http_io = "0.2.5"
+indicatif = "0.13.0"
+structopt = "0.3.7"
 
 [dev-dependencies]
-tempfile = "*"
+tempfile = "3.1.0"
