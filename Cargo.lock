@@ -137,7 +137,7 @@ dependencies = [
 
 [[package]]
 name = "http_io"
-version = "0.2.7"
+version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "hashbrown 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -427,7 +427,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "wcp"
 version = "0.1.1"
 dependencies = [
- "http_io 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "http_io 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "indicatif 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "tempfile 3.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -470,7 +470,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum hashbrown 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "29fba9abe4742d586dfd0c06ae4f7e73a1c2d86b856933509b269d82cdf06e18"
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum hermit-abi 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)" = "eff2656d88f158ce120947499e971d743c05dbcbed62e5bd2f38f1698bbc3772"
-"checksum http_io 0.2.7 (registry+https://github.com/rust-lang/crates.io-index)" = "fe160385b113ec10aa0725efcae38f541c96483c0bb062d9c77859528389352f"
+"checksum http_io 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "443f007243b23b196221d692a9205991861dd1da13f5fc1bbdc7fe498289a33e"
 "checksum indicatif 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8572bccfb0665e70b7faf44ee28841b8e0823450cd4ad562a76b5a3c4bf48487"
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 "checksum libc 0.2.66 (registry+https://github.com/rust-lang/crates.io-index)" = "d515b1f41455adea1313a4a2ac8a8a477634fbae63cc6100e3aebb207ce61558"
