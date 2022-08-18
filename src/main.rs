@@ -1,6 +1,6 @@
 /* copyright Remi Bernotavicius 2020 */
 
-use http_io::client::HttpClient;
+use http_io::client::{HttpClient, StdTransport};
 use http_io::protocol::{HttpBody, OutgoingBody};
 use http_io::url::Url;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -191,14 +191,14 @@ impl<S: io::Read + io::Write> StreamFinish for OutgoingBody<S> {
 }
 
 impl<'a> CopySource<'a> for Url {
-    type Stream = HttpBody<&'a mut TcpStream>;
+    type Stream = HttpBody<&'a mut StdTransport>;
     fn open_for_read(&self, context: &'a mut CopyContext) -> Result<Self::Stream> {
         Ok(context.http_client.get(self.clone())?.finish()?.body)
     }
 }
 
 impl<'a> CopySink<'a> for Url {
-    type Stream = OutgoingBody<&'a mut TcpStream>;
+    type Stream = OutgoingBody<&'a mut StdTransport>;
     fn open_for_write(&self, context: &'a mut CopyContext) -> Result<Self::Stream> {
         Ok(context.http_client.put(self.clone())?)
     }
