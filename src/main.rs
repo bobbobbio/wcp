@@ -1,7 +1,7 @@
 /* copyright Remi Bernotavicius 2020 */
 
 use http_io::client::{HttpClient, StdTransport};
-use http_io::protocol::{HttpBody, OutgoingBody};
+use http_io::protocol::{HttpBody, OutgoingRequest};
 use http_io::url::Url;
 use indicatif::{ProgressBar, ProgressStyle};
 use std::convert::Infallible;
@@ -183,7 +183,7 @@ impl<R: io::Read> StreamSize for HttpBody<R> {
     }
 }
 
-impl<S: io::Read + io::Write> StreamFinish for OutgoingBody<S> {
+impl<S: io::Read + io::Write> StreamFinish for OutgoingRequest<S> {
     fn stream_finish(self) -> Result<()> {
         self.finish()?;
         Ok(())
@@ -198,7 +198,7 @@ impl<'a> CopySource<'a> for Url {
 }
 
 impl<'a> CopySink<'a> for Url {
-    type Stream = OutgoingBody<&'a mut StdTransport>;
+    type Stream = OutgoingRequest<&'a mut StdTransport>;
     fn open_for_write(&self, context: &'a mut CopyContext) -> Result<Self::Stream> {
         Ok(context.http_client.put(self.clone())?)
     }
